@@ -81,33 +81,44 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
       }
 
       if (event.submitWorklog) {
-        currentLogs.add("⏳ [$dateStr] Processing Worklog...");
-        emit(AttendanceRunning(logs: List.from(currentLogs), savedToken: previousToken));
+        final textForDate = _getTextForDate(event.worklogText, dateStr);
 
-        final entries = _parseEntries(event.worklogText);
-        
-        if (entries.isEmpty) {
-            currentLogs.add("⚠️ [$dateStr] No valid worklog formatting ([HH:MM-HH:MM]) found. Falling back to default split.");
+        if (textForDate == null) {
+          currentLogs.add("⏭️ [$dateStr] Skipped Worklog (No data provided for this date)");
+          emit(AttendanceRunning(logs: List.from(currentLogs), savedToken: previousToken));
+        } else {
+          currentLogs.add("⏳ [$dateStr] Processing Worklog...");
+          emit(AttendanceRunning(logs: List.from(currentLogs), savedToken: previousToken));
+
+          final entries = _parseEntries(textForDate);
+          
+          if (entries.isEmpty) {
+              currentLogs.add("⚠️ [$dateStr] No valid worklog formatting ([HH:MM - HH:MM]) found. Falling back to default split.");
+          }
+
+          final finalEntries = entries.isNotEmpty ? entries : _getDefaultEntries(textForDate);
+
+          final worklogResult = await submitWorklog(WorklogParams(
+            date: dateStr, 
+            token: event.token, 
+            entries: finalEntries,
+          ));
+          
+          worklogResult.fold(
+            (failure) {
+              currentLogs.add("❌ [$dateStr] Worklog Failed: ${failure.message}");
+            },
+            (_) {
+              currentLogs.add("✅ [$dateStr] Worklog Successful");
+              for (var entry in finalEntries) {
+                currentLogs.add("   ┕ [${entry.startTime} - ${entry.endTime}] ${entry.description}");
+              }
+            },
+          );
+
+          emit(AttendanceRunning(logs: List.from(currentLogs), savedToken: previousToken));
+          await Future.delayed(const Duration(milliseconds: 600));
         }
-
-        final worklogResult = await submitWorklog(WorklogParams(
-          date: dateStr, 
-          token: event.token, 
-          entries: entries.isNotEmpty ? entries : _getDefaultEntries(event.worklogText),
-        ));
-        
-        worklogResult.fold(
-          (failure) {
-            currentLogs.add("❌ [$dateStr] Worklog Failed: ${failure.message}");
-          },
-          (_) {
-            final count = entries.isNotEmpty ? entries.length : 2;
-            currentLogs.add("✅ [$dateStr] Worklog Successful ($count segments)");
-          },
-        );
-
-        emit(AttendanceRunning(logs: List.from(currentLogs), savedToken: previousToken));
-        await Future.delayed(const Duration(milliseconds: 600));
       }
 
       current = current.add(const Duration(days: 1));
@@ -120,19 +131,58 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   List<WorklogEntry> _parseEntries(String text) {
     final List<WorklogEntry> entries = [];
     final lines = text.split('\n');
-    final regex = RegExp(r'\[(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\]\s*(.*)');
+    final regex = RegExp(r'\[(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\]\s*(.*)');
 
     for (var line in lines) {
       final match = regex.firstMatch(line.trim());
       if (match != null) {
+        String start = match.group(1)!;
+        String end = match.group(2)!;
+        
+        // Pad single digit hours so 9:00 becomes 09:00 for the API
+        if (start.length == 4) start = "0$start";
+        if (end.length == 4) end = "0$end";
+
         entries.add(WorklogEntry(
-          startTime: match.group(1)!,
-          endTime: match.group(2)!,
+          startTime: start,
+          endTime: end,
           description: match.group(3)!.trim(),
         ));
       }
     }
     return entries;
+  }
+
+  String? _getTextForDate(String text, String targetDate) {
+    final datePattern = RegExp(r'\b\d{4}-\d{2}-\d{2}\b');
+    if (!datePattern.hasMatch(text)) {
+      return text; // No dates found anywhere, treat entire text as applicable for every day
+    }
+
+    final lines = text.split('\n');
+    final StringBuffer block = StringBuffer();
+    bool recording = false;
+    bool foundDate = false;
+
+    for (var line in lines) {
+      final match = datePattern.firstMatch(line);
+      if (match != null) {
+        if (match.group(0) == targetDate) {
+          recording = true;
+          foundDate = true;
+        } else {
+          recording = false;
+        }
+      } else if (recording) {
+        block.writeln(line);
+      }
+    }
+
+    if (foundDate) {
+      return block.toString();
+    } else {
+      return null;
+    }
   }
 
   List<WorklogEntry> _getDefaultEntries(String text) {

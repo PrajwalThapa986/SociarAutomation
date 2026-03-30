@@ -275,14 +275,24 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
                   if (_submitWorklog) ...[
                     TextField(
                       controller: _worklogController,
-                      decoration: const InputDecoration(
-                        labelText: 'Daily Worklog (HTML or Text)',
-                        hintText: 'e.g. <p>Implemented feature X</p>',
-                        border: OutlineInputBorder(),
-                        alignLabelWithHint: true,
-                      ),
                       maxLines: 5,
-                      enabled: !isRunning,
+                      style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                      decoration: InputDecoration(
+                        labelText: 'Daily Worklog Content',
+                        hintText: '[Date: 2026-03-24]\n[09:00 - 13:00] Task details...\n[14:00 - 18:00] Next task details...\n\n[Date: 2026-03-25]\n[09:00 - 13:00] More tasks...',
+                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                        alignLabelWithHint: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        filled: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 24),
                   ],
