@@ -15,6 +15,7 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
   final TextEditingController _tokenController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   DateTimeRange? _selectedDateRange;
+  bool _saveTokenLocally = true;
 
   @override
   void initState() {
@@ -113,7 +114,19 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
                   obscureText: true,
                   enabled: !isRunning,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  title: const Text("Save token locally"),
+                  value: _saveTokenLocally,
+                  onChanged: isRunning ? null : (val) {
+                    setState(() {
+                      _saveTokenLocally = val ?? true;
+                    });
+                  },
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 16),
 
                 // Date Selection
                 Card(
@@ -173,6 +186,7 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
                                   token: token,
                                   startDate: _selectedDateRange!.start,
                                   endDate: _selectedDateRange!.end,
+                                  saveTokenLocally: _saveTokenLocally,
                                 ),
                               );
                         },

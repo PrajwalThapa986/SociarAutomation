@@ -1,5 +1,4 @@
 import 'package:http/http.dart' as http;
-import '../../../../core/error/failures.dart';
 
 import 'package:injectable/injectable.dart';
 
@@ -35,8 +34,8 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     // Derive fixed times based on the date being iterated
     // date format from UI: YYYY-MM-DD
     final requestDate = '${date}T18:15:00.000000Z';
-    final checkIn = '${date}T03:15:00.000000Z';
-    final checkOut = '${date}T12:15:00.000000Z';
+    final checkIn = '09:00';
+    final checkOut = '18:00';
 
     // Add form data
     request.fields['request_date'] = requestDate;

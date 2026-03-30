@@ -1,5 +1,4 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../core/error/failures.dart';
 
 import 'package:injectable/injectable.dart';
 

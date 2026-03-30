@@ -13,13 +13,15 @@ class ExecuteAttendanceEvent extends AttendanceEvent {
   final String token;
   final DateTime startDate;
   final DateTime endDate;
+  final bool saveTokenLocally;
 
   const ExecuteAttendanceEvent({
     required this.token,
     required this.startDate,
     required this.endDate,
+    this.saveTokenLocally = true,
   });
 
   @override
-  List<Object> get props => [token, startDate, endDate];
+  List<Object> get props => [token, startDate, endDate, saveTokenLocally];
 }

@@ -33,8 +33,10 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
 
   Future<void> _onExecuteAttendance(ExecuteAttendanceEvent event, Emitter<AttendanceState> emit) async {
     // Save token immediately when executing
-    await saveToken(event.token);
-    final previousToken = event.token;
+    if (event.saveTokenLocally) {
+      await saveToken(event.token);
+    }
+    final previousToken = event.saveTokenLocally ? event.token : null;
 
     List<String> currentLogs = ["🚀 Starting execution..."];
     emit(AttendanceRunning(logs: List.from(currentLogs), savedToken: previousToken));
