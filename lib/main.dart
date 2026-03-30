@@ -1,121 +1,346 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const AttendanceAutomatorApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class AttendanceAutomatorApp extends StatelessWidget {
+  const AttendanceAutomatorApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Attendance Automator',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      darkTheme: ThemeData.dark(useMaterial3: true).copyWith(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.teal,
+          brightness: Brightness.dark,
+        ),
+      ),
+      themeMode: ThemeMode.system,
+      home: const AutomatorScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class AutomatorScreen extends StatefulWidget {
+  const AutomatorScreen({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<AutomatorScreen> createState() => _AutomatorScreenState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _AutomatorScreenState extends State<AutomatorScreen> {
+  final TextEditingController _tokenController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  
+  DateTimeRange? _selectedDateRange;
+  bool _isRunning = false;
+  List<String> _logs = [];
 
-  void _incrementCounter() {
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedToken();
+    // Default to today for selection if needed
+    final today = DateTime.now();
+    _selectedDateRange = DateTimeRange(start: today, end: today);
+  }
+
+  @override
+  void dispose() {
+    _tokenController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSavedToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedToken = prefs.getString('auth_token');
+    if (savedToken != null) {
+      _tokenController.text = savedToken;
+    }
+  }
+
+  Future<void> _saveToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
+  }
+
+  void _addLog(String message) {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _logs.add(message);
+    });
+    // Auto-scroll to the bottom
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _pickDateRange() async {
+    DateTime now = DateTime.now();
+    DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      initialDateRange: _selectedDateRange,
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDateRange = picked;
+      });
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+  }
+
+  Future<void> _execute() async {
+    final token = _tokenController.text.trim();
+    if (token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your Bearer token.')),
+      );
+      return;
+    }
+
+    if (_selectedDateRange == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a date range.')),
+      );
+      return;
+    }
+
+    // Save token for future use
+    await _saveToken(token);
+
+    setState(() {
+      _isRunning = true;
+      _logs.clear();
+    });
+
+    _addLog("🚀 Starting execution...");
+
+    DateTime current = _selectedDateRange!.start;
+    DateTime end = _selectedDateRange!.end;
+
+    // Loop through each date (inclusive)
+    while (!current.isAfter(end)) {
+      String dateStr = _formatDate(current);
+      _addLog("⏳ [$dateStr] Processing...");
+
+      try {
+        final headers = {
+          "Authorization": "Bearer $token",
+          "Content-Type": "application/json",
+        };
+        final body = jsonEncode({"date": dateStr});
+
+        // 1. Daily Update API
+        final updateResponse = await http.post(
+          Uri.parse('https://api.placeholder.com/daily-update'),
+          headers: headers,
+          body: body,
+        );
+
+        if (updateResponse.statusCode == 200 || updateResponse.statusCode == 201) {
+          _addLog("✅ [$dateStr] Update successful (${updateResponse.statusCode})");
+        } else {
+          _addLog("❌ [$dateStr] Update failed: ${updateResponse.statusCode} ${updateResponse.reasonPhrase}");
+        }
+
+        // 2. Attendance API
+        final attendanceResponse = await http.post(
+          Uri.parse('https://api.placeholder.com/attendance'),
+          headers: headers,
+          body: body,
+        );
+
+        if (attendanceResponse.statusCode == 200 || attendanceResponse.statusCode == 201) {
+          _addLog("✅ [$dateStr] Attendance successful (${attendanceResponse.statusCode})");
+        } else {
+          _addLog("❌ [$dateStr] Attendance failed: ${attendanceResponse.statusCode} ${attendanceResponse.reasonPhrase}");
+        }
+      } catch (e) {
+        _addLog("❌ [$dateStr] Network/Unexpected error: $e");
+      }
+
+      // Crucial delay to prevent rate-limiting
+      await Future.delayed(const Duration(milliseconds: 600));
+      
+      // Increment day
+      current = current.add(const Duration(days: 1));
+    }
+
+    _addLog("🏁 Execution completed.");
+    setState(() {
+      _isRunning = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    String dateRangeText = "No date range selected";
+    if (_selectedDateRange != null) {
+      if (_selectedDateRange!.start.isAtSameMomentAs(_selectedDateRange!.end)) {
+        dateRangeText = _formatDate(_selectedDateRange!.start);
+      } else {
+        dateRangeText = "${_formatDate(_selectedDateRange!.start)} to ${_formatDate(_selectedDateRange!.end)}";
+      }
+    }
+
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text('Attendance Automator'),
+        centerTitle: true,
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+            // Token Input
+            TextField(
+              controller: _tokenController,
+              decoration: const InputDecoration(
+                labelText: 'Bearer Token',
+                hintText: 'ey...',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.security),
+              ),
+              obscureText: true, // Typically tokens are hidden
+              enabled: !_isRunning,
+            ),
+            const SizedBox(height: 24),
+
+            // Date Selection
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Selected Date Range:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            dateRangeText,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _isRunning ? null : _pickDateRange,
+                      icon: const Icon(Icons.date_range),
+                      label: const Text('Select Dates'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Controls
+            ElevatedButton(
+              onPressed: _isRunning ? null : _execute,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              ),
+              child: _isRunning
+                  ? const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Executing...',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    )
+                  : const Text(
+                      'Execute',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+            ),
+            const SizedBox(height: 24),
+
+            // Log Console
+            const Text(
+              'Execution Logs',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade800),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: _logs.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Logs will appear here...',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: _scrollController,
+                        itemCount: _logs.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 4.0),
+                            child: SelectableText(
+                              _logs[index],
+                              style: const TextStyle(
+                                color: Colors.greenAccent,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
       ),
     );
   }
