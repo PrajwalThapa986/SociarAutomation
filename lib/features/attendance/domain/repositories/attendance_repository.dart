@@ -4,6 +4,5 @@ import '../../../../core/error/failures.dart';
 abstract class AttendanceRepository {
   Future<Either<Failure, void>> saveToken(String token);
   Future<Either<Failure, String?>> getToken();
-  Future<Either<Failure, void>> submitDailyUpdate(String date, String token);
   Future<Either<Failure, void>> submitAttendance(String date, String token);
 }
