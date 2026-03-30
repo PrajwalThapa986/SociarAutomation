@@ -4,6 +4,9 @@ import '../../domain/repositories/attendance_repository.dart';
 import '../datasources/attendance_remote_data_source.dart';
 import '../datasources/token_local_data_source.dart';
 
+import 'package:injectable/injectable.dart';
+
+@LazySingleton(as: AttendanceRepository)
 class AttendanceRepositoryImpl implements AttendanceRepository {
   final AttendanceRemoteDataSource remoteDataSource;
   final TokenLocalDataSource localDataSource;

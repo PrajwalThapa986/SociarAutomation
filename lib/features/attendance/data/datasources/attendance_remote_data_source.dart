@@ -1,10 +1,13 @@
 import 'package:http/http.dart' as http;
 import '../../../../core/error/failures.dart';
 
+import 'package:injectable/injectable.dart';
+
 abstract class AttendanceRemoteDataSource {
   Future<void> submitAttendance(String date, String token);
 }
 
+@LazySingleton(as: AttendanceRemoteDataSource)
 class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   final http.Client client;
 

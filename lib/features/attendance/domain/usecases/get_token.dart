@@ -3,6 +3,9 @@ import '../../../../core/error/failures.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../repositories/attendance_repository.dart';
 
+import 'package:injectable/injectable.dart';
+
+@lazySingleton
 class GetToken implements UseCase<String?, NoParams> {
   final AttendanceRepository repository;
   GetToken(this.repository);

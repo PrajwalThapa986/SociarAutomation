@@ -4,6 +4,9 @@ import '../../../../core/error/failures.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../repositories/attendance_repository.dart';
 
+import 'package:injectable/injectable.dart';
+
+@lazySingleton
 class SubmitAttendance implements UseCase<void, ApiParams> {
   final AttendanceRepository repository;
   SubmitAttendance(this.repository);

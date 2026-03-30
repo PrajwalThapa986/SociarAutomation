@@ -6,6 +6,9 @@ import '../../../../core/usecases/usecase.dart';
 import 'attendance_event.dart';
 import 'attendance_state.dart';
 
+import 'package:injectable/injectable.dart';
+
+@injectable
 class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   final GetToken getToken;
   final SaveToken saveToken;

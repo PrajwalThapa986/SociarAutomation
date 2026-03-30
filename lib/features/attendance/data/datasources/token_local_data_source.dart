@@ -1,6 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/error/failures.dart';
 
+import 'package:injectable/injectable.dart';
+
 abstract class TokenLocalDataSource {
   Future<void> saveToken(String token);
   Future<String?> getToken();
@@ -8,6 +10,7 @@ abstract class TokenLocalDataSource {
 
 const cachedTokenKey = 'auth_token';
 
+@LazySingleton(as: TokenLocalDataSource)
 class TokenLocalDataSourceImpl implements TokenLocalDataSource {
   final SharedPreferences sharedPreferences;
 
