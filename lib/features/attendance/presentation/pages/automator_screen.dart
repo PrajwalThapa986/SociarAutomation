@@ -16,6 +16,8 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
   final ScrollController _scrollController = ScrollController();
   DateTimeRange? _selectedDateRange;
   bool _saveTokenLocally = true;
+  bool _isSingleDateMode = false;
+  bool _skipWeekends = true;
 
   @override
   void initState() {
@@ -60,15 +62,33 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
     }
   }
 
+  Future<void> _pickSingleDate(BuildContext context) async {
+    DateTime now = DateTime.now();
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDateRange?.start ?? now,
+      firstDate: now.subtract(const Duration(days: 365)),
+      lastDate: now.add(const Duration(days: 365)),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDateRange = DateTimeRange(start: picked, end: picked);
+      });
+    }
+  }
+
   String _formatDate(DateTime date) {
     return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
   }
 
   @override
   Widget build(BuildContext context) {
-    String dateRangeText = "No date range selected";
+    String dateRangeText = "No date selected";
     if (_selectedDateRange != null) {
-      if (_selectedDateRange!.start.isAtSameMomentAs(_selectedDateRange!.end)) {
+      if (_selectedDateRange!.start.day == _selectedDateRange!.end.day && 
+          _selectedDateRange!.start.month == _selectedDateRange!.end.month && 
+          _selectedDateRange!.start.year == _selectedDateRange!.end.year) {
         dateRangeText = _formatDate(_selectedDateRange!.start);
       } else {
         dateRangeText = "${_formatDate(_selectedDateRange!.start)} to ${_formatDate(_selectedDateRange!.end)}";
@@ -114,19 +134,69 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
                   obscureText: true,
                   enabled: !isRunning,
                 ),
-                const SizedBox(height: 8),
-                CheckboxListTile(
-                  title: const Text("Save token locally"),
-                  value: _saveTokenLocally,
-                  onChanged: isRunning ? null : (val) {
-                    setState(() {
-                      _saveTokenLocally = val ?? true;
-                    });
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
+                Row(
+                  children: [
+                    Expanded(
+                      child: CheckboxListTile(
+                        title: const Text("Save token"),
+                        value: _saveTokenLocally,
+                        onChanged: isRunning ? null : (val) {
+                          setState(() {
+                            _saveTokenLocally = val ?? true;
+                          });
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    Expanded(
+                      child: CheckboxListTile(
+                        title: const Text("Skip Weekends"),
+                        value: _skipWeekends,
+                        onChanged: isRunning ? null : (val) {
+                          setState(() {
+                            _skipWeekends = val ?? true;
+                          });
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
+
+                // Mode Selection
+                Row(
+                  children: [
+                    const Text("Mode:", style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 12),
+                    ChoiceChip(
+                      label: const Text("Range"),
+                      selected: !_isSingleDateMode,
+                      onSelected: isRunning ? null : (selected) {
+                        if (selected) {
+                          setState(() {
+                            _isSingleDateMode = false;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text("Single Day"),
+                      selected: _isSingleDateMode,
+                      onSelected: isRunning ? null : (selected) {
+                        if (selected) {
+                          setState(() {
+                            _isSingleDateMode = true;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
 
                 // Date Selection
                 Card(
@@ -140,9 +210,9 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                'Selected Date Range:',
-                                style: TextStyle(
+                              Text(
+                                _isSingleDateMode ? 'Selected Date:' : 'Selected Date Range:',
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 14,
                                 ),
@@ -156,9 +226,11 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
                           ),
                         ),
                         ElevatedButton.icon(
-                          onPressed: isRunning ? null : () => _pickDateRange(context),
-                          icon: const Icon(Icons.date_range),
-                          label: const Text('Select Dates'),
+                          onPressed: isRunning 
+                              ? null 
+                              : () => _isSingleDateMode ? _pickSingleDate(context) : _pickDateRange(context),
+                          icon: Icon(_isSingleDateMode ? Icons.calendar_today : Icons.date_range),
+                          label: Text(_isSingleDateMode ? 'Select Date' : 'Select Dates'),
                         ),
                       ],
                     ),
@@ -187,6 +259,7 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
                                   startDate: _selectedDateRange!.start,
                                   endDate: _selectedDateRange!.end,
                                   saveTokenLocally: _saveTokenLocally,
+                                  skipWeekends: _skipWeekends,
                                 ),
                               );
                         },

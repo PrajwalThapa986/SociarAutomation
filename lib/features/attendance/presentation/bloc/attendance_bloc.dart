@@ -45,9 +45,9 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
     DateTime end = event.endDate;
 
     while (!current.isAfter(end)) {
-      // 1. Omit Fridays and Saturdays
+      // 1. Omit Fridays and Saturdays if skipWeekends is enabled
       // DateTime.weekday: Monday is 1, Friday is 5, Saturday is 6
-      if (current.weekday == DateTime.friday || current.weekday == DateTime.saturday) {
+      if (event.skipWeekends && (current.weekday == DateTime.friday || current.weekday == DateTime.saturday)) {
         currentLogs.add("⏭️ [${_formatDate(current)}] Skipped (Weekend)");
         emit(AttendanceRunning(logs: List.from(currentLogs), savedToken: previousToken));
         current = current.add(const Duration(days: 1));
