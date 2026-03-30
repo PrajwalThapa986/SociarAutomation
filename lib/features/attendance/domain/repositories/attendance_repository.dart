@@ -5,4 +5,5 @@ abstract class AttendanceRepository {
   Future<Either<Failure, void>> saveToken(String token);
   Future<Either<Failure, String?>> getToken();
   Future<Either<Failure, void>> submitAttendance(String date, String token);
+  Future<Either<Failure, void>> submitWorklog(String date, String token, String logContent);
 }

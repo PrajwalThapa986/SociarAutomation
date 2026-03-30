@@ -13,11 +13,14 @@ class AutomatorScreen extends StatefulWidget {
 
 class _AutomatorScreenState extends State<AutomatorScreen> {
   final TextEditingController _tokenController = TextEditingController();
+  final TextEditingController _worklogController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   DateTimeRange? _selectedDateRange;
   bool _saveTokenLocally = true;
   bool _isSingleDateMode = false;
   bool _skipWeekends = true;
+  bool _submitAttendance = true;
+  bool _submitWorklog = false;
 
   @override
   void initState() {
@@ -30,6 +33,7 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
   @override
   void dispose() {
     _tokenController.dispose();
+    _worklogController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -117,191 +121,251 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
           bool isRunning = state is AttendanceRunning;
           List<String> logs = state.logs;
 
-          return Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Token Input
-                TextField(
-                  controller: _tokenController,
-                  decoration: const InputDecoration(
-                    labelText: 'Bearer Token',
-                    hintText: 'ey...',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.security),
+          return SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Token Input
+                  TextField(
+                    controller: _tokenController,
+                    decoration: const InputDecoration(
+                      labelText: 'Bearer Token',
+                      hintText: 'ey...',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.security),
+                    ),
+                    obscureText: true,
+                    enabled: !isRunning,
                   ),
-                  obscureText: true,
-                  enabled: !isRunning,
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: CheckboxListTile(
-                        title: const Text("Save token"),
-                        value: _saveTokenLocally,
-                        onChanged: isRunning ? null : (val) {
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CheckboxListTile(
+                          title: const Text("Save token"),
+                          value: _saveTokenLocally,
+                          onChanged: isRunning ? null : (val) {
+                            setState(() {
+                              _saveTokenLocally = val ?? true;
+                            });
+                          },
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                      Expanded(
+                        child: CheckboxListTile(
+                          title: const Text("Skip Weekends"),
+                          value: _skipWeekends,
+                          onChanged: isRunning ? null : (val) {
+                            setState(() {
+                              _skipWeekends = val ?? true;
+                            });
+                          },
+                          controlAffinity: ListTileControlAffinity.leading,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Action Selection
+                  Row(
+                    children: [
+                      const Text("Actions:", style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 12),
+                      FilterChip(
+                        label: const Text("Attendance"),
+                        selected: _submitAttendance,
+                        onSelected: isRunning ? null : (selected) {
                           setState(() {
-                            _saveTokenLocally = val ?? true;
+                            _submitAttendance = selected;
                           });
                         },
-                        controlAffinity: ListTileControlAffinity.leading,
-                        contentPadding: EdgeInsets.zero,
                       ),
-                    ),
-                    Expanded(
-                      child: CheckboxListTile(
-                        title: const Text("Skip Weekends"),
-                        value: _skipWeekends,
-                        onChanged: isRunning ? null : (val) {
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        label: const Text("Worklog"),
+                        selected: _submitWorklog,
+                        onSelected: isRunning ? null : (selected) {
                           setState(() {
-                            _skipWeekends = val ?? true;
+                            _submitWorklog = selected;
                           });
                         },
-                        controlAffinity: ListTileControlAffinity.leading,
-                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Mode Selection
+                  Row(
+                    children: [
+                      const Text("Date Mode:", style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 12),
+                      ChoiceChip(
+                        label: const Text("Range"),
+                        selected: !_isSingleDateMode,
+                        onSelected: isRunning ? null : (selected) {
+                          if (selected) {
+                            setState(() {
+                              _isSingleDateMode = false;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text("Single Day"),
+                        selected: _isSingleDateMode,
+                        onSelected: isRunning ? null : (selected) {
+                          if (selected) {
+                            setState(() {
+                              _isSingleDateMode = true;
+                            });
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Date Selection
+                  Card(
+                    elevation: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _isSingleDateMode ? 'Selected Date:' : 'Selected Date Range:',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  dateRangeText,
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: isRunning 
+                                ? null 
+                                : () => _isSingleDateMode ? _pickSingleDate(context) : _pickDateRange(context),
+                            icon: Icon(_isSingleDateMode ? Icons.calendar_today : Icons.date_range),
+                            label: Text(_isSingleDateMode ? 'Select Date' : 'Select Dates'),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Mode Selection
-                Row(
-                  children: [
-                    const Text("Mode:", style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 12),
-                    ChoiceChip(
-                      label: const Text("Range"),
-                      selected: !_isSingleDateMode,
-                      onSelected: isRunning ? null : (selected) {
-                        if (selected) {
-                          setState(() {
-                            _isSingleDateMode = false;
-                          });
-                        }
-                      },
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Worklog Input (Conditional)
+                  if (_submitWorklog) ...[
+                    TextField(
+                      controller: _worklogController,
+                      decoration: const InputDecoration(
+                        labelText: 'Daily Worklog (HTML or Text)',
+                        hintText: 'e.g. <p>Implemented feature X</p>',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                      maxLines: 5,
+                      enabled: !isRunning,
                     ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: const Text("Single Day"),
-                      selected: _isSingleDateMode,
-                      onSelected: isRunning ? null : (selected) {
-                        if (selected) {
-                          setState(() {
-                            _isSingleDateMode = true;
-                          });
-                        }
-                      },
-                    ),
+                    const SizedBox(height: 24),
                   ],
-                ),
-                const SizedBox(height: 12),
 
-                // Date Selection
-                Card(
-                  elevation: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                  // Controls
+                  ElevatedButton(
+                    onPressed: isRunning
+                        ? null
+                        : () {
+                            final token = _tokenController.text.trim();
+                            if (token.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please enter your Bearer token.')),
+                              );
+                              return;
+                            }
+                            if (_selectedDateRange == null) {
+                              return;
+                            }
+                            if (!_submitAttendance && !_submitWorklog) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please select at least one action (Attendance or Worklog).')),
+                              );
+                              return;
+                            }
+                            if (_submitWorklog && _worklogController.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please enter a worklog.')),
+                              );
+                              return;
+                            }
+                            context.read<AttendanceBloc>().add(
+                                  ExecuteAttendanceEvent(
+                                    token: token,
+                                    startDate: _selectedDateRange!.start,
+                                    endDate: _selectedDateRange!.end,
+                                    saveTokenLocally: _saveTokenLocally,
+                                    skipWeekends: _skipWeekends,
+                                    submitAttendance: _submitAttendance,
+                                    submitWorklog: _submitWorklog,
+                                    worklogText: _worklogController.text,
+                                  ),
+                                );
+                          },
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    ),
+                    child: isRunning
+                        ? const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(
-                                _isSingleDateMode ? 'Selected Date:' : 'Selected Date Range:',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                              SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              SizedBox(width: 12),
                               Text(
-                                dateRangeText,
-                                style: const TextStyle(fontSize: 16),
+                                'Executing...',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                             ],
+                          )
+                        : const Text(
+                            'Execute',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           ),
-                        ),
-                        ElevatedButton.icon(
-                          onPressed: isRunning 
-                              ? null 
-                              : () => _isSingleDateMode ? _pickSingleDate(context) : _pickDateRange(context),
-                          icon: Icon(_isSingleDateMode ? Icons.calendar_today : Icons.date_range),
-                          label: Text(_isSingleDateMode ? 'Select Date' : 'Select Dates'),
-                        ),
-                      ],
-                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                // Controls
-                ElevatedButton(
-                  onPressed: isRunning
-                      ? null
-                      : () {
-                          final token = _tokenController.text.trim();
-                          if (token.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Please enter your Bearer token.')),
-                            );
-                            return;
-                          }
-                          if (_selectedDateRange == null) {
-                            return;
-                          }
-                          context.read<AttendanceBloc>().add(
-                                ExecuteAttendanceEvent(
-                                  token: token,
-                                  startDate: _selectedDateRange!.start,
-                                  endDate: _selectedDateRange!.end,
-                                  saveTokenLocally: _saveTokenLocally,
-                                  skipWeekends: _skipWeekends,
-                                ),
-                              );
-                        },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  // Log Console
+                  const Text(
+                    'Execution Logs',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                  child: isRunning
-                      ? const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            ),
-                            SizedBox(width: 12),
-                            Text(
-                              'Executing...',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        )
-                      : const Text(
-                          'Execute',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                ),
-                const SizedBox(height: 24),
-
-                // Log Console
-                const Text(
-                  'Execution Logs',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: Container(
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 350, // Fixed height for log console
                     decoration: BoxDecoration(
                       color: Colors.black87,
                       borderRadius: BorderRadius.circular(8),
@@ -332,8 +396,8 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
                             },
                           ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },

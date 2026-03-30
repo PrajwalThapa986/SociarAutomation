@@ -24,6 +24,8 @@ import 'package:attendance_automator/features/attendance/domain/usecases/save_to
     as _i893;
 import 'package:attendance_automator/features/attendance/domain/usecases/submit_attendance.dart'
     as _i924;
+import 'package:attendance_automator/features/attendance/domain/usecases/submit_worklog.dart'
+    as _i176;
 import 'package:attendance_automator/features/attendance/presentation/bloc/attendance_bloc.dart'
     as _i193;
 import 'package:get_it/get_it.dart' as _i174;
@@ -67,11 +69,15 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i924.SubmitAttendance>(
       () => _i924.SubmitAttendance(gh<_i818.AttendanceRepository>()),
     );
+    gh.lazySingleton<_i176.SubmitWorklog>(
+      () => _i176.SubmitWorklog(gh<_i818.AttendanceRepository>()),
+    );
     gh.factory<_i193.AttendanceBloc>(
       () => _i193.AttendanceBloc(
         getToken: gh<_i110.GetToken>(),
         saveToken: gh<_i893.SaveToken>(),
         submitAttendance: gh<_i924.SubmitAttendance>(),
+        submitWorklog: gh<_i176.SubmitWorklog>(),
       ),
     );
     return this;

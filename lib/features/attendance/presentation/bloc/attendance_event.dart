@@ -15,6 +15,9 @@ class ExecuteAttendanceEvent extends AttendanceEvent {
   final DateTime endDate;
   final bool saveTokenLocally;
   final bool skipWeekends;
+  final bool submitAttendance;
+  final bool submitWorklog;
+  final String worklogText;
 
   const ExecuteAttendanceEvent({
     required this.token,
@@ -22,8 +25,20 @@ class ExecuteAttendanceEvent extends AttendanceEvent {
     required this.endDate,
     this.saveTokenLocally = true,
     this.skipWeekends = true,
+    this.submitAttendance = true,
+    this.submitWorklog = false,
+    this.worklogText = "",
   });
 
   @override
-  List<Object> get props => [token, startDate, endDate, saveTokenLocally, skipWeekends];
+  List<Object> get props => [
+        token,
+        startDate,
+        endDate,
+        saveTokenLocally,
+        skipWeekends,
+        submitAttendance,
+        submitWorklog,
+        worklogText,
+      ];
 }
