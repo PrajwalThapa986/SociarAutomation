@@ -1,5 +1,5 @@
+import '../../../../core/error/exceptions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import 'package:injectable/injectable.dart';
 
 abstract class TokenLocalDataSource {
@@ -20,7 +20,7 @@ class TokenLocalDataSourceImpl implements TokenLocalDataSource {
     try {
       return sharedPreferences.getString(cachedTokenKey);
     } catch (e) {
-      throw CacheException('Failed to get token');
+      throw CacheException();
     }
   }
 
@@ -29,12 +29,7 @@ class TokenLocalDataSourceImpl implements TokenLocalDataSource {
     try {
       await sharedPreferences.setString(cachedTokenKey, token);
     } catch (e) {
-      throw CacheException('Failed to save token');
+      throw ServerException('Failed to save token');
     }
   }
-}
-
-class CacheException implements Exception {
-  final String message;
-  CacheException(this.message);
 }

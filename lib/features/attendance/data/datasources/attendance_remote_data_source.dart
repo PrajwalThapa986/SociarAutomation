@@ -1,10 +1,11 @@
 import 'package:http/http.dart' as http;
-
 import 'package:injectable/injectable.dart';
+import '../../domain/entities/worklog_entry.dart';
+import '../../../../core/error/exceptions.dart';
 
 abstract class AttendanceRemoteDataSource {
   Future<void> submitAttendance(String date, String token);
-  Future<void> submitWorklog(String date, String token, String logContent);
+  Future<void> submitWorklog(String date, String token, List<WorklogEntry> entries);
 }
 
 @LazySingleton(as: AttendanceRemoteDataSource)
@@ -32,11 +33,10 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       'x-requested-with': 'XMLHttpRequest',
     });
 
-    // Derive fixed times based on the date being iterated
-    // date format from UI: YYYY-MM-DD
+    // Derive fixed times
     final requestDate = '${date}T18:15:00.000000Z';
-    final checkIn = '09:00';
-    final checkOut = '18:00';
+    const checkIn = '09:00';
+    const checkOut = '18:00';
 
     // Add form data
     request.fields['request_date'] = requestDate;
@@ -46,7 +46,6 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
     request.fields['check_in'] = checkIn;
     request.fields['check_out'] = checkOut;
 
-    // Send the request via http.Client (we have to use client.send for multipart to allow mocking and DI benefits)
     final streamedResponse = await client.send(request);
     final response = await http.Response.fromStream(streamedResponse);
 
@@ -56,7 +55,7 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   }
 
   @override
-  Future<void> submitWorklog(String date, String token, String logContent) async {
+  Future<void> submitWorklog(String date, String token, List<WorklogEntry> entries) async {
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('https://new-central-api.sociair.com/api/hris/worklog'),
@@ -74,31 +73,28 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
       'x-requested-with': 'XMLHttpRequest',
     });
 
-    final htmlLog = "<p>$logContent</p>";
-
     // Date
     request.fields['date'] = date;
     
-    // Entry 0 (Morning)
-    request.fields['entries[0][start_time]'] = '09:00';
-    request.fields['entries[0][end_time]'] = '13:00';
-    request.fields['entries[0][mst_project_id]'] = '41';
-    request.fields['entries[0][mst_kpi_id]'] = '';
-    request.fields['entries[0][activity_type]'] = '';
-    request.fields['entries[0][mst_dynamic_form_id]'] = '';
-    request.fields['entries[0][description]'] = htmlLog;
-    request.fields['entries[0][dynamicForm]'] = '585';
-
-    // Entry 1 (Afternoon)
-    request.fields['entries[1][id]'] = DateTime.now().millisecondsSinceEpoch.toString();
-    request.fields['entries[1][activity_type]'] = '';
-    request.fields['entries[1][mst_dynamic_form_id]'] = '';
-    request.fields['entries[1][mst_project_id]'] = '41';
-    request.fields['entries[1][mst_kpi_id]'] = '';
-    request.fields['entries[1][start_time]'] = '14:00';
-    request.fields['entries[1][end_time]'] = '18:00';
-    request.fields['entries[1][description]'] = htmlLog;
-    request.fields['entries[1][dynamicForm]'] = '424';
+    for (int i = 0; i < entries.length; i++) {
+        final entry = entries[i];
+        final prefix = 'entries[$i]';
+        
+        request.fields['$prefix[start_time]'] = entry.startTime;
+        request.fields['$prefix[end_time]'] = entry.endTime;
+        request.fields['$prefix[description]'] = "<p>${entry.description}</p>";
+        request.fields['$prefix[mst_project_id]'] = '41';
+        request.fields['$prefix[mst_kpi_id]'] = '';
+        request.fields['$prefix[activity_type]'] = '';
+        request.fields['$prefix[mst_dynamic_form_id]'] = '';
+        
+        // Dynamic Form Mapping
+        request.fields['$prefix[dynamicForm]'] = i == 0 ? '585' : '424';
+        
+        if (i > 0) {
+            request.fields['$prefix[id]'] = (DateTime.now().millisecondsSinceEpoch + i).toString();
+        }
+    }
 
     final streamedResponse = await client.send(request);
     final response = await http.Response.fromStream(streamedResponse);
@@ -109,7 +105,3 @@ class AttendanceRemoteDataSourceImpl implements AttendanceRemoteDataSource {
   }
 }
 
-class ServerException implements Exception {
-  final String message;
-  ServerException(this.message);
-}

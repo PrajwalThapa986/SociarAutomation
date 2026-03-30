@@ -1,5 +1,7 @@
 import 'package:dartz/dartz.dart';
 import '../../../../core/error/failures.dart';
+import '../../../../core/error/exceptions.dart';
+import '../../domain/entities/worklog_entry.dart';
 import '../../domain/repositories/attendance_repository.dart';
 import '../datasources/attendance_remote_data_source.dart';
 import '../datasources/token_local_data_source.dart';
@@ -53,9 +55,9 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
   }
 
   @override
-  Future<Either<Failure, void>> submitWorklog(String date, String token, String logContent) async {
+  Future<Either<Failure, void>> submitWorklog(String date, String token, List<WorklogEntry> entries) async {
     try {
-      await remoteDataSource.submitWorklog(date, token, logContent);
+      await remoteDataSource.submitWorklog(date, token, entries);
       return const Right(null);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));

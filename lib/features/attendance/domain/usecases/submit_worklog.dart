@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../repositories/attendance_repository.dart';
+import '../entities/worklog_entry.dart';
 
 import 'package:injectable/injectable.dart';
 
@@ -13,21 +14,21 @@ class SubmitWorklog implements UseCase<void, WorklogParams> {
 
   @override
   Future<Either<Failure, void>> call(WorklogParams params) async {
-    return await repository.submitWorklog(params.date, params.token, params.logContent);
+    return await repository.submitWorklog(params.date, params.token, params.entries);
   }
 }
 
 class WorklogParams extends Equatable {
   final String date;
   final String token;
-  final String logContent;
+  final List<WorklogEntry> entries;
 
   const WorklogParams({
     required this.date,
     required this.token,
-    required this.logContent,
+    required this.entries,
   });
 
   @override
-  List<Object> get props => [date, token, logContent];
+  List<Object> get props => [date, token, entries];
 }
