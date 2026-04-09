@@ -4,6 +4,8 @@ import '../../domain/usecases/get_token.dart';
 import '../../domain/usecases/save_token.dart';
 import '../../domain/usecases/submit_attendance.dart';
 import '../../domain/usecases/submit_worklog.dart';
+import '../../domain/usecases/fetch_pending_request_ids.dart';
+import '../../domain/usecases/approve_attendance_request.dart';
 import '../../../../core/usecases/usecase.dart';
 import 'attendance_event.dart';
 import 'attendance_state.dart';
@@ -16,15 +18,20 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
   final SaveToken saveToken;
   final SubmitAttendance submitAttendance;
   final SubmitWorklog submitWorklog;
+  final FetchPendingRequestIds fetchPendingRequestIds;
+  final ApproveAttendanceRequest approveAttendanceRequest;
 
   AttendanceBloc({
     required this.getToken,
     required this.saveToken,
     required this.submitAttendance,
     required this.submitWorklog,
+    required this.fetchPendingRequestIds,
+    required this.approveAttendanceRequest,
   }) : super(const AttendanceInitial()) {
     on<LoadTokenEvent>(_onLoadToken);
     on<ExecuteAttendanceEvent>(_onExecuteAttendance);
+    on<ApproveAttendanceRequestsEvent>(_onApproveAttendanceRequests);
   }
 
   Future<void> _onLoadToken(LoadTokenEvent event, Emitter<AttendanceState> emit) async {
@@ -126,6 +133,58 @@ class AttendanceBloc extends Bloc<AttendanceEvent, AttendanceState> {
 
     currentLogs.add("🏁 Execution completed.");
     emit(AttendanceCompleted(logs: List.from(currentLogs), savedToken: previousToken));
+  }
+
+  Future<void> _onApproveAttendanceRequests(
+      ApproveAttendanceRequestsEvent event, Emitter<AttendanceState> emit) async {
+    if (event.saveTokenLocally) {
+      await saveToken(event.token);
+    }
+    final previousToken = event.saveTokenLocally ? event.token : null;
+
+    List<String> currentLogs = ["🚀 Fetching pending attendance requests..."];
+    emit(AttendanceRunning(logs: List.from(currentLogs), savedToken: previousToken));
+
+    final fetchResult = await fetchPendingRequestIds(TokenParams(token: event.token));
+
+    await fetchResult.fold(
+      (failure) async {
+        currentLogs.add("❌ Failed to fetch requests: ${failure.message}");
+        emit(AttendanceCompleted(logs: List.from(currentLogs), savedToken: previousToken));
+      },
+      (ids) async {
+        if (ids.isEmpty) {
+          currentLogs.add("✅ No pending requests found.");
+          emit(AttendanceCompleted(logs: List.from(currentLogs), savedToken: previousToken));
+          return;
+        }
+
+        currentLogs.add("📋 Found ${ids.length} pending request(s). Approving...");
+        emit(AttendanceRunning(logs: List.from(currentLogs), savedToken: previousToken));
+
+        for (final id in ids) {
+          currentLogs.add("⏳ Approving request #$id...");
+          emit(AttendanceRunning(logs: List.from(currentLogs), savedToken: previousToken));
+
+          final result = await approveAttendanceRequest(ApproveParams(id: id, token: event.token));
+
+          result.fold(
+            (failure) {
+              currentLogs.add("❌ Request #$id Failed: ${failure.message}");
+            },
+            (_) {
+              currentLogs.add("✅ Request #$id Approved");
+            },
+          );
+
+          emit(AttendanceRunning(logs: List.from(currentLogs), savedToken: previousToken));
+          await Future.delayed(const Duration(milliseconds: 600));
+        }
+
+        currentLogs.add("🏁 All requests processed.");
+        emit(AttendanceCompleted(logs: List.from(currentLogs), savedToken: previousToken));
+      },
+    );
   }
 
   List<WorklogEntry> _parseEntries(String text) {

@@ -42,3 +42,16 @@ class ExecuteAttendanceEvent extends AttendanceEvent {
         worklogText,
       ];
 }
+
+class ApproveAttendanceRequestsEvent extends AttendanceEvent {
+  final String token;
+  final bool saveTokenLocally;
+
+  const ApproveAttendanceRequestsEvent({
+    required this.token,
+    this.saveTokenLocally = true,
+  });
+
+  @override
+  List<Object> get props => [token, saveTokenLocally];
+}

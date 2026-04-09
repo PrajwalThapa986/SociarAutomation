@@ -297,6 +297,36 @@ class _AutomatorScreenState extends State<AutomatorScreen> {
                     const SizedBox(height: 24),
                   ],
 
+                  // Approve Pending Requests
+                  OutlinedButton.icon(
+                    onPressed: isRunning
+                        ? null
+                        : () {
+                            final token = _tokenController.text.trim();
+                            if (token.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Please enter your Bearer token.')),
+                              );
+                              return;
+                            }
+                            context.read<AttendanceBloc>().add(
+                                  ApproveAttendanceRequestsEvent(
+                                    token: token,
+                                    saveTokenLocally: _saveTokenLocally,
+                                  ),
+                                );
+                          },
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text(
+                      'Approve All Pending Requests',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
                   // Controls
                   ElevatedButton(
                     onPressed: isRunning

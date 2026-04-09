@@ -18,6 +18,10 @@ import 'package:attendance_automator/features/attendance/data/repositories/atten
     as _i1063;
 import 'package:attendance_automator/features/attendance/domain/repositories/attendance_repository.dart'
     as _i818;
+import 'package:attendance_automator/features/attendance/domain/usecases/approve_attendance_request.dart'
+    as _i741;
+import 'package:attendance_automator/features/attendance/domain/usecases/fetch_pending_request_ids.dart'
+    as _i362;
 import 'package:attendance_automator/features/attendance/domain/usecases/get_token.dart'
     as _i110;
 import 'package:attendance_automator/features/attendance/domain/usecases/save_token.dart'
@@ -72,12 +76,20 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i176.SubmitWorklog>(
       () => _i176.SubmitWorklog(gh<_i818.AttendanceRepository>()),
     );
+    gh.lazySingleton<_i362.FetchPendingRequestIds>(
+      () => _i362.FetchPendingRequestIds(gh<_i818.AttendanceRepository>()),
+    );
+    gh.lazySingleton<_i741.ApproveAttendanceRequest>(
+      () => _i741.ApproveAttendanceRequest(gh<_i818.AttendanceRepository>()),
+    );
     gh.factory<_i193.AttendanceBloc>(
       () => _i193.AttendanceBloc(
         getToken: gh<_i110.GetToken>(),
         saveToken: gh<_i893.SaveToken>(),
         submitAttendance: gh<_i924.SubmitAttendance>(),
         submitWorklog: gh<_i176.SubmitWorklog>(),
+        fetchPendingRequestIds: gh<_i362.FetchPendingRequestIds>(),
+        approveAttendanceRequest: gh<_i741.ApproveAttendanceRequest>(),
       ),
     );
     return this;

@@ -65,4 +65,28 @@ class AttendanceRepositoryImpl implements AttendanceRepository {
       return Left(ServerFailure(e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, List<int>>> fetchPendingRequestIds(String token) async {
+    try {
+      final ids = await remoteDataSource.fetchPendingRequestIds(token);
+      return Right(ids);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> approveAttendanceRequest(int id, String token) async {
+    try {
+      await remoteDataSource.approveAttendanceRequest(id, token);
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
 }
